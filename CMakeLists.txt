@@ -22,7 +22,7 @@ add_executable (
     "vec3.h"
     "vec4.h"
     "triangle.h"
-    "backends/backend.h"
+    "backends/backend_interface.h"
     "backends/raster/backend.cpp"
     "backends/raster/backend.h"
     "backends/raster/zbuffer.cpp"

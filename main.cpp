@@ -22,6 +22,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "backends/raster/backend.h"
 #include "picture.h"
 
+// mkdir build
+// cd build
+// cmake ..
+// make
+// ./stl2thumbnail ../cube.stl ./crub -s750x600
+
 int main(int argc, char** argv)
 {
     // command line
@@ -30,8 +36,8 @@ int main(int argc, char** argv)
 
     args::Group group(parser, "This group is all exclusive:", args::Group::Validators::All);
     args::Positional<std::string> in(group, "in", "The stl filename");
-    args::Positional<std::string> out(group, "out", "The thumbnail picture filename");
-    args::ValueFlag<unsigned> picSize(group, "size", "The thumbnail size", { 's' });
+    args::Positional<std::string> out(group, "out", "The thumbnail picture filename prefix");
+    args::ValueFlag<std::string> picSize(group, "widthxheight", "The thumbnail size", { 's' });
 
     try
     {
@@ -54,12 +60,18 @@ int main(int argc, char** argv)
         return 0;
     }
 
+    std::string size = picSize.Get();
+    std::cout << size << std::endl;
+
+    unsigned width, height;
+    std::sscanf(size.c_str(), "%ux%u", &width, &height);
+
     // parse STL
     stl::Parser stlParser;
     Mesh mesh;
     try
     {
-        mesh = stlParser.parseFile(in.Get());
+        stlParser.parseFile(mesh, in.Get());
     }
     catch (...)
     {
@@ -69,12 +81,23 @@ int main(int argc, char** argv)
 
     std::cout << "Triangles: " << mesh.size() << std::endl;
 
-    // render using raster backend
-    RasterBackend backend(picSize.Get());
-    auto pic = backend.render(mesh);
+    const int PIC_COUNT = 4;
+    const Vec3 view_pos[PIC_COUNT] = {{ -1.f, -1.f, 1.f }, { 1.f, -1.f, 1.f }, { 1.f, 1.f, -1.f }, { -1.f, 1.f, -1.f }};
 
-    // save to disk
-    pic.save(out.Get());
+    for (int i = 0; i < PIC_COUNT; ++i)
+    {
+        // render using raster backend
+        RasterBackend backend(width, height);
+        Picture pic(width, height);
+        backend.render(pic, mesh, view_pos[i]);
+
+        // save to disk
+        std::string png_file_path(out.Get());
+        png_file_path += "-";
+        png_file_path.append(std::to_string(i + 1));
+        png_file_path += ".png";
+        pic.save(png_file_path);
+    }
 
     return 0;
 }

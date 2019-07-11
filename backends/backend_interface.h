@@ -17,12 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #pragma once
 
-#include "../picture.h"
+#include "picture.h"
 #include "triangle.h"
 
-class Backend
+class BackendInterface
 {
 public:
-    virtual ~Backend()                            = default;
-    virtual Picture render(const Mesh& triangles) = 0;
+    virtual ~BackendInterface()                            = default;
+    virtual int render(Picture& pic, const Mesh& mesh, const Vec3& view_pos) = 0;
 };

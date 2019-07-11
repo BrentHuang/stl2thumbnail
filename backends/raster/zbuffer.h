@@ -22,12 +22,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 class ZBuffer
 {
 public:
-    ZBuffer(unsigned size);
+    explicit ZBuffer(size_t width, size_t height);
 
-    bool testAndSet(unsigned x, unsigned y, float z);
-    unsigned size() const;
+    bool testAndSet(size_t x, size_t y, float z);
+//    size_t size() const;
 
 private:
-    unsigned m_size = 0;
+    size_t m_width = 0;
+    size_t m_height = 0;
+//    size_t m_size = 0;
     std::vector<float> m_buffer;
 };

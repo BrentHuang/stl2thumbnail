@@ -18,13 +18,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #pragma once
 
 #include <cmath>
-#include <iostream>
+//#include <iostream>
 
 struct Vec3
 {
     float x = .0f;
     float y = .0f;
     float z = .0f;
+
+    Vec3()
+    {
+        x = y = z = .0f;
+    }
+
+    Vec3(float ax, float ay, float az) : x(ax), y(ay), z(az)
+    {
+    }
 
     float length() const
     {
@@ -37,11 +46,11 @@ struct Vec3
         return { x / l, y / l, z / l };
     }
 
-    friend std::ostream& operator<<(std::ostream& out, const Vec3& v)
-    {
-        out << "[X: " << v.x << " Y: " << v.y << " Z: " << v.z << "]";
-        return out;
-    }
+//    friend std::ostream& operator<<(std::ostream& out, const Vec3& v)
+//    {
+//        out << "[X: " << v.x << " Y: " << v.y << " Z: " << v.z << "]";
+//        return out;
+//    }
 };
 
 inline Vec3 operator+(const Vec3& a, const Vec3& b)
@@ -81,10 +90,11 @@ inline float dot(const Vec3& a, const Vec3& b)
 
 inline Vec3 cross(const Vec3& a, const Vec3& b)
 {
-    return {
-        a.y * b.z - a.z * b.y,
-        a.z * b.x - a.x * b.z,
-        a.x * b.y - a.y * b.x
+    return
+    {
+        a.y* b.z - a.z * b.y,
+        a.z* b.x - a.x * b.z,
+        a.x* b.y - a.y* b.x
     };
 }
 

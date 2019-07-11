@@ -19,26 +19,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <array>
 #include <vector>
-
 #include "vec3.h"
-
-struct Ray;
 
 struct Triangle
 {
-    std::array<Vec3, 3> vertices;
-    Vec3 normal;
+    std::array<Vec3, 3> vertices; // 3个顶点
+    Vec3 normal; // 法线
 
-    friend std::ostream& operator<<(std::ostream& out, const Triangle& v)
-    {
-        out << ">>>\n";
-        out << v.normal << "\n";
-        out << v.vertices[0] << "\n"
-            << v.vertices[1] << "\n"
-            << v.vertices[2] << "\n";
-        out << "<<<\n";
-        return out;
-    }
+//    friend std::ostream& operator<<(std::ostream& out, const Triangle& triangle)
+//    {
+//        out << ">>>\n";
+//        out << triangle.normal << "\n";
+//        out << triangle.vertices[0] << "\n"
+//            << triangle.vertices[1] << "\n"
+//            << triangle.vertices[2] << "\n";
+//        out << "<<<\n";
+//        return out;
+//    }
 
     Vec3 calcNormal() const
     {

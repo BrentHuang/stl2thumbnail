@@ -16,31 +16,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "backend.h"
+#include <glm/glm.hpp> // sudo apt-get install libglm-dev
+#include <glm/gtc/matrix_transform.hpp>
 #include "aabb.h"
 #include "zbuffer.h"
 
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-
 // helpers
-glm::vec3 vec3ToGlm(const Vec3& v)
+static glm::vec3 vec3ToGlm(const Vec3& v)
 {
     return { v.x, v.y, v.z };
 }
 
-float edgeFunction(glm::vec2 p, glm::vec2 a, glm::vec2 b)
+static float edgeFunction(glm::vec2 p, glm::vec2 a, glm::vec2 b)
 {
     return (p.x - a.x) * (b.y - a.y) - (p.y - a.y) * (b.x - a.x);
 }
 
-glm::vec3 glmMat4x4MulVec3(const glm::mat4x4& mat, glm::vec3 v)
+static glm::vec3 glmMat4x4MulVec3(const glm::mat4x4& mat, glm::vec3 v)
 {
     return glm::vec3(mat * glm::vec4{ v.x, v.y, v.z, 1.0f });
 }
 
 //
-RasterBackend::RasterBackend(unsigned size)
-    : m_size(size)
+RasterBackend::RasterBackend(size_t width, size_t height) : m_width(width), m_height(height)
 {
 }
 
@@ -48,26 +46,26 @@ RasterBackend::~RasterBackend()
 {
 }
 
-Picture RasterBackend::render(const Mesh& triangles)
+int RasterBackend::render(Picture& pic, const Mesh& mesh, const Vec3& view_pos)
 {
-    ZBuffer m_zbuffer(m_size);
-    Picture pic(m_size);
-    pic.fill(m_backgroundColor.x, m_backgroundColor.y, m_backgroundColor.z, m_backgroundColor.w);
+    ZBuffer zbuffer(m_width, m_height);
+//    pic.fill(m_backgroundColor.x, m_backgroundColor.y, m_backgroundColor.z, m_backgroundColor.w); // 设置背景色
+    pic.setBackground();
 
     // generate AABB and find its center
-    auto aabb          = AABBox(triangles);
+    auto aabb          = AABBox(mesh);
     auto largestStride = aabb.stride();
     auto center        = vec3ToGlm(aabb.center());
 
     // create model view projection matrix
     const float zoom   = 1.0f;
     auto projection    = glm::ortho(zoom * .5f, -zoom * .5f, -zoom * .5f, zoom * .5f, 0.0f, 1.0f);
-    auto viewPos       = glm::vec3{ -1.f, -1.f, 1.f };
+    auto viewPos       = glm::vec3{ view_pos.x, view_pos.y, view_pos.z };
     auto view          = glm::lookAt(viewPos, glm::vec3{ 0.f, 0.f, 0.f }, { 0.f, 0.f, 1.f });
     auto model         = glm::scale(glm::mat4(1), glm::vec3{ 1.0f / largestStride }) * glm::translate(glm::mat4(1), -center);
     auto modelViewProj = projection * view * model;
 
-    for (const auto& t : triangles)
+    for (const auto& t : mesh)
     {
         // project vertices to screen coordinates
         auto v0 = glmMat4x4MulVec3(modelViewProj, vec3ToGlm(t.vertices[0]));
@@ -81,18 +79,18 @@ Picture RasterBackend::render(const Mesh& triangles)
         float maxY = std::max(v0.y, std::max(v1.y, v2.y));
 
         // bounding box in screen space
-        unsigned sminX = static_cast<unsigned>(std::max(0, static_cast<int>((minX + 1.0f) / 2.0f * m_size)));
-        unsigned sminY = static_cast<unsigned>(std::max(0, static_cast<int>((minY + 1.0f) / 2.0f * m_size)));
-        unsigned smaxX = static_cast<unsigned>(std::max(0, std::min(int(m_size), static_cast<int>((maxX + 1.0f) / 2.0f * m_size))));
-        unsigned smaxY = static_cast<unsigned>(std::max(0, std::min(int(m_size), static_cast<int>((maxY + 1.0f) / 2.0f * m_size))));
+        unsigned sminX = static_cast<unsigned>(std::max(0, static_cast<int>((minX + 1.0f) / 2.0f * m_width)));
+        unsigned sminY = static_cast<unsigned>(std::max(0, static_cast<int>((minY + 1.0f) / 2.0f * m_height)));
+        unsigned smaxX = static_cast<unsigned>(std::max(0, std::min(int(m_height), static_cast<int>((maxX + 1.0f) / 2.0f * m_width))));
+        unsigned smaxY = static_cast<unsigned>(std::max(0, std::min(int(m_height), static_cast<int>((maxY + 1.0f) / 2.0f * m_height))));
 
         for (unsigned y = sminY; y < smaxY + 1; ++y)
         {
             for (unsigned x = sminX; x < smaxX + 1; ++x)
             {
                 // normalize screen coords [-1,1]
-                const float nx = 2.f * (x / static_cast<float>(m_size) - 0.5f);
-                const float ny = 2.f * (y / static_cast<float>(m_size) - 0.5f);
+                const float nx = 2.f * (x / static_cast<float>(m_width) - 0.5f);
+                const float ny = 2.f * (y / static_cast<float>(m_height) - 0.5f);
 
                 auto P  = glm::vec2{ nx, ny };
                 auto V0 = glm::vec2(v0);
@@ -117,7 +115,7 @@ Picture RasterBackend::render(const Mesh& triangles)
                     float px = w0 * v0.x + w1 * v1.x + w2 * v2.x;
                     float py = w0 * v0.y + w1 * v1.y + w2 * v2.y;
 
-                    if (m_zbuffer.testAndSet(x, y, pz))
+                    if (zbuffer.testAndSet(x, y, pz))
                     {
                         // calculate lightning
                         // diffuse
@@ -142,5 +140,5 @@ Picture RasterBackend::render(const Mesh& triangles)
         }
     }
 
-    return pic;
+    return 0;
 }

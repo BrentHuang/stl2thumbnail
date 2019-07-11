@@ -16,11 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "parser.h"
-#include "helpers.h"
-
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include <fstream>
-
-#define HEADER_SIZE 80
+#include "helpers.h"
 
 // STL format specifications: http://www.fabbers.com/tech/STL_Format
 
@@ -30,17 +30,28 @@ Parser::Parser()
 {
 }
 
-Mesh Parser::parseFile(const std::string& filename) const
+Parser::~Parser()
 {
-    std::ifstream stream(filename, std::ifstream::in | std::ifstream::binary);
+}
 
+int Parser::parseFile(Mesh& mesh, const std::string& file_path) const
+{
+    std::ifstream stream(file_path, std::ifstream::in | std::ifstream::binary);
     if (!stream)
-        throw("Cannot open file");
+    {
+//        throw ("Cannot open file");
+        return -1;
+    }
 
     if (isBinaryFormat(stream))
-        return parseBinary(stream);
+    {
+        struct stat stat_buf;
+        stat(file_path.c_str(), &stat_buf);
 
-    return parseAscii(stream);
+        return parseBinary(mesh, stream, stat_buf.st_size);
+    }
+
+    return parseAscii(mesh, stream);
 }
 
 bool Parser::isBinaryFormat(std::ifstream& in) const
@@ -59,42 +70,61 @@ bool Parser::isBinaryFormat(std::ifstream& in) const
     return line.substr(0, 5) != "facet";
 }
 
-Mesh Parser::parseBinary(std::ifstream& in) const
+int Parser::parseBinary(Mesh& mesh, std::ifstream& in, size_t file_size) const
 {
     // skip header
-    in.seekg(HEADER_SIZE);
+    in.seekg(80); // 文件起始的80个字节是文件头，用于存贮零件名
 
-    Mesh triangles;
-
-    // get the number of triangles in the stl
-    uint32_t triangleCount = readU32(in);
-    triangles.reserve(triangleCount);
-
-    // parse triangles
-    for (size_t i = 0; i < triangleCount && in; ++i)
+    // get the number of triangles in the stl 紧接着用4个字节的整数来描述模型的三角面片个数
+    const uint32_t triangleCount = readU32(in);
+    if ((84 + 50 * triangleCount) != file_size)
     {
-        Triangle triangle = readBinaryTriangle(in);
-
-        triangles.push_back(triangle);
+        return -1;
     }
 
-    return triangles;
+    mesh.reserve(triangleCount); // 太大了内存可能会爆掉
+
+    // parse triangles 后面逐个给出每个三角面片的几何信息
+    size_t i;
+
+    for (i = 0; i < triangleCount && in; ++i)
+    {
+        Triangle triangle;
+
+        if (readBinaryTriangle(triangle, in) != 0)
+        {
+            return -1;
+        }
+
+        mesh.emplace_back(triangle);
+    }
+
+    return 0;
 }
 
-Mesh Parser::parseAscii(std::ifstream& in) const
+int Parser::parseAscii(Mesh& mesh, std::ifstream& in) const
 {
-    Mesh triangles;
-
     // solid name
     std::string line;
     std::getline(in, line);
+    if (line.substr(0, 5) != "solid")
+    {
+        return -1;
+    }
 
     while (in)
     {
-        triangles.push_back(readAsciiTriangle(in));
+        Triangle triangle;
+
+        if (readAsciiTriangle(triangle, in) != 0)
+        {
+            return -1;
+        }
+
+        mesh.emplace_back(triangle);
     }
 
-    return triangles;
+    return 0;
 }
 
 uint32_t Parser::readU32(std::ifstream& in) const
@@ -118,55 +148,70 @@ float Parser::readFloat(std::ifstream& in) const
     return v;
 }
 
-Vec3 Parser::readVector3(std::ifstream& in) const
+int Parser::readVector3(Vec3& v, std::ifstream& in) const
 {
-    Vec3 v;
     v.x = readFloat(in);
     v.y = readFloat(in);
     v.z = -readFloat(in);
 
-    return v;
+    return 0;
 }
 
-Triangle Parser::readAsciiTriangle(std::ifstream& in) const
+int Parser::readAsciiTriangle(Triangle& triangle, std::ifstream& in) const
 {
-    Triangle t;
-
     std::string line;
 
     getTrimmedLine(in, line);
-    std::sscanf(line.c_str(), "facet normal %e %e %e", &t.normal.x, &t.normal.y, &t.normal.z);
+    int n = std::sscanf(line.c_str(), "facet normal %e %e %e", &triangle.normal.x, &triangle.normal.y, &triangle.normal.z);
+    if (n != 3)
+    {
+        if (0 == line.length() || "endsolid" == line.substr(0, 8))
+        {
+            // 要么是endpoint，要么是文件结束
+            return 0;
+        }
 
-    std::getline(in, line); // outer loop
+        return -1;
+    }
+
+    getTrimmedLine(in, line); // outer loop
 
     for (size_t i = 0; i < 3; ++i)
     {
         getTrimmedLine(in, line);
-        std::sscanf(line.c_str(), "vertex %e %e %e", &t.vertices[i].x, &t.vertices[i].y, &t.vertices[i].z);
+        n = std::sscanf(line.c_str(), "vertex %e %e %e", &triangle.vertices[i].x, &triangle.vertices[i].y, &triangle.vertices[i].z);
+        if (n != 3)
+        {
+            return -1;
+        }
     }
 
-    std::getline(in, line); // endloop
-    std::getline(in, line); // endfacet
+    getTrimmedLine(in, line); // endloop
+    getTrimmedLine(in, line); // endfacet
 
-    return t;
+    return 0;
 }
 
-Triangle Parser::readBinaryTriangle(std::ifstream& in) const
+int Parser::readBinaryTriangle(Triangle& triangle, std::ifstream& in) const
 {
-    Triangle t;
+    // 每个三角面片占用固定的50个字节，依次是3个4字节浮点数(角面片的法矢量)，
+    // 3个4字节浮点数(1个顶点的坐标)，3个4字节浮点数(2个顶点的坐标)，3个4字节浮点数(3个顶点的坐标)，
+    // 最后2个字节用来描述三角面片的属性信息
+    readVector3(triangle.normal, in);
+    triangle.normal.normalize();
 
-    t.normal = readVector3(in).normalize();
-
-    t.vertices[1] = readVector3(in);
-    t.vertices[0] = readVector3(in);
-    t.vertices[2] = readVector3(in);
+    readVector3(triangle.vertices[1], in);
+    readVector3(triangle.vertices[0], in);
+    readVector3(triangle.vertices[2], in);
     readU16(in); // attributes
 
     // some stl files have garbage normals
     // we recalculate them here in case they are NaN
-    if (std::isnan(t.normal.x) || std::isnan(t.normal.y) || std::isnan(t.normal.z))
-        t.normal = t.calcNormal().normalize();
+    if (std::isnan(triangle.normal.x) || std::isnan(triangle.normal.y) || std::isnan(triangle.normal.z))
+    {
+        triangle.normal = triangle.calcNormal().normalize();
+    }
 
-    return t;
+    return 0;
 }
 } // namespace

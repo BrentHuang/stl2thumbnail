@@ -16,30 +16,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "zbuffer.h"
-
 #include <limits>
 
-ZBuffer::ZBuffer(unsigned size)
-    : m_size(size)
+ZBuffer::ZBuffer(size_t width, size_t height) : m_width(width), m_height(height)
 {
-    m_buffer.resize(size * size);
+    m_buffer.resize(m_width * m_height);
 
     for (std::size_t i = 0; i < m_buffer.size(); ++i)
+    {
         m_buffer[i] = -std::numeric_limits<float>::infinity();
+    }
 }
 
-bool ZBuffer::testAndSet(unsigned x, unsigned y, float z)
+bool ZBuffer::testAndSet(size_t x, size_t y, float z)
 {
-    if (z > m_buffer[y * m_size + x])
+    if (z > m_buffer[y * m_width + x])
     {
-        m_buffer[y * m_size + x] = z;
+        m_buffer[y * m_width + x] = z;
         return true;
     }
 
     return false;
 }
 
-unsigned ZBuffer::size() const
-{
-    return m_size;
-}
+//size_t ZBuffer::size() const
+//{
+//    return m_size;
+//}

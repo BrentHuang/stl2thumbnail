@@ -18,20 +18,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #pragma once
 
 #include "triangle.h"
-
 #include <limits>
 
+// axis-aligned bounding box
 struct AABBox
 {
-    Vec3 lower;
-    Vec3 upper;
+    Vec3 lower; // 包围盒最小坐标点
+    Vec3 upper; // 包围盒最大坐标点
 
     AABBox();
-    AABBox(const Mesh& triangles);
+    explicit AABBox(const Mesh& mesh);
 
     float stride() const
     {
-        return std::sqrt(size().x * size().x + size().y * size().y + size().z * size().z);
+        const Vec3& s = size();
+        return std::sqrt(s.x * s.x + s.y * s.y + s.z * s.z);
     }
 
     Vec3 size() const

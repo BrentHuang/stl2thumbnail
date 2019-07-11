@@ -23,4 +23,13 @@ struct Vec4
     float y = .0f;
     float z = .0f;
     float w = .0f;
+
+    Vec4()
+    {
+        x = y = z = w = .0f;
+    }
+
+    Vec4(float ax, float ay, float az, float aw) : x(ax), y(ay), z(az), w(aw)
+    {
+    }
 };
