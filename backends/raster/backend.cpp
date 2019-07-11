@@ -81,7 +81,7 @@ int RasterBackend::render(Picture& pic, const Mesh& mesh, const Vec3& view_pos)
         // bounding box in screen space
         unsigned sminX = static_cast<unsigned>(std::max(0, static_cast<int>((minX + 1.0f) / 2.0f * m_width)));
         unsigned sminY = static_cast<unsigned>(std::max(0, static_cast<int>((minY + 1.0f) / 2.0f * m_height)));
-        unsigned smaxX = static_cast<unsigned>(std::max(0, std::min(int(m_height), static_cast<int>((maxX + 1.0f) / 2.0f * m_width))));
+        unsigned smaxX = static_cast<unsigned>(std::max(0, std::min(int(m_width), static_cast<int>((maxX + 1.0f) / 2.0f * m_width))));
         unsigned smaxY = static_cast<unsigned>(std::max(0, std::min(int(m_height), static_cast<int>((maxY + 1.0f) / 2.0f * m_height))));
 
         for (unsigned y = sminY; y < smaxY + 1; ++y)
