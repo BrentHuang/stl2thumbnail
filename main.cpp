@@ -26,7 +26,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // cd build
 // cmake ..
 // make
-// ./stl2thumbnail ../cube.stl ./crub -s750x600
+// ./stl2thumbnail ../hua.stl ./hua -s750x600
+// ./stl2thumbnail ../chaojisaiyaren.stl ./chaojisaiyaren -s750x600
 
 int main(int argc, char** argv)
 {
